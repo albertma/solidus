@@ -122,6 +122,8 @@ RSpec.describe 'order factory' do
           total: 110,
           state: 'complete'
         )
+        expect(order.inventory_units.where(pending: true)).to be_empty
+        expect(order.inventory_units.where(pending: false)).to_not be_empty
       end
     end
   end
@@ -201,7 +203,8 @@ RSpec.describe 'order factory' do
         expect(order).to have_attributes(
           total: 110,
           payment_total: 110,
-          payment_state: "paid"
+          payment_state: "paid",
+          shipment_state: "shipped"
         )
 
         expect(order.payments.count).to eq 1

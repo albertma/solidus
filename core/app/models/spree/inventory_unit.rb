@@ -21,6 +21,7 @@ module Spree
 
     before_destroy :ensure_can_destroy
 
+    scope :pending, -> { where pending: true }
     scope :backordered, -> { where state: 'backordered' }
     scope :on_hand, -> { where state: 'on_hand' }
     scope :pre_shipment, -> { where(state: PRE_SHIPMENT_STATES) }
@@ -29,7 +30,7 @@ module Spree
     scope :returned, -> { where state: 'returned' }
     scope :canceled, -> { where(state: 'canceled') }
     scope :not_canceled, -> { where.not(state: 'canceled') }
-    scope :cancelable, -> { where(state: Spree::InventoryUnit::CANCELABLE_STATES) }
+    scope :cancelable, -> { where(state: Spree::InventoryUnit::CANCELABLE_STATES, pending: false) }
     scope :backordered_per_variant, ->(stock_item) do
       includes(:shipment, :order)
         .where("spree_shipments.state != 'canceled'").references(:shipment)
@@ -140,7 +141,7 @@ module Spree
         throw :abort
       end
 
-      unless shipment.pending?
+      if shipment.shipped? || shipment.canceled?
         errors.add(:base, :cannot_destroy_shipment_state, state: shipment.state)
         throw :abort
       end

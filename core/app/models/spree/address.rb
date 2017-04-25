@@ -33,15 +33,6 @@ module Spree
       new(country: Spree::Country.default)
     end
 
-    def self.default(user = nil, kind = "bill")
-      Spree::Deprecation.warn("Address.default is deprecated. Use User.default_address or Address.build_default", caller)
-      if user
-        user.send(:"#{kind}_address") || build_default
-      else
-        build_default
-      end
-    end
-
     # @return [Address] an equal address already in the database or a newly created one
     def self.factory(attributes)
       full_attributes = value_attributes(column_defaults, new(attributes).attributes)
@@ -114,18 +105,29 @@ module Spree
       value_attributes == other_address.value_attributes
     end
 
+    # @deprecated Do not use this. Use Address.== instead.
     def same_as?(other_address)
-      Spree::Deprecation.warn("Address.same_as? is deprecated. It's equivalent to Address.==", caller)
+      Spree::Deprecation.warn("Address#same_as? is deprecated. It's equivalent to Address.==", caller)
       self == other_address
     end
 
+    # @deprecated Do not use this. Use Address.== instead.
     def same_as(other_address)
-      Spree::Deprecation.warn("Address.same_as is deprecated. It's equivalent to Address.==", caller)
+      Spree::Deprecation.warn("Address#same_as is deprecated. It's equivalent to Address.==", caller)
       self == other_address
     end
 
+    # @deprecated Do not use this
     def empty?
+      Spree::Deprecation.warn("Address#empty? is deprecated.", caller)
       attributes.except('id', 'created_at', 'updated_at', 'country_id').all? { |_, v| v.nil? }
+    end
+
+    # This exists because the default Object#blank?, checks empty? if it is
+    # defined, and we have defined empty.
+    # This should be removed once empty? is removed
+    def blank?
+      false
     end
 
     # @return [Hash] an ActiveMerchant compatible address hash

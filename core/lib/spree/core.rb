@@ -46,16 +46,6 @@ module Spree
   module Core
     autoload :ProductFilters, "spree/core/product_filters"
 
-    def self.const_missing(name)
-      case name
-      when :AdjustmentSource, :CalculatedAdjustments, :UserAddress, :UserPaymentSource
-        Spree::Deprecation.warn("Spree::Core::#{name} is deprecated! Use Spree::#{name} instead.", caller)
-        Spree.const_get(name)
-      else
-        super
-      end
-    end
-
     class GatewayError < RuntimeError; end
     class DestroyWithOrdersError < StandardError; end
   end
@@ -90,7 +80,6 @@ require 'spree/core/controller_helpers/respond_with'
 require 'spree/core/controller_helpers/search'
 require 'spree/core/controller_helpers/store'
 require 'spree/core/controller_helpers/strong_parameters'
-require 'spree/core/unreturned_item_charger'
 require 'spree/core/role_configuration'
 require 'spree/core/stock_configuration'
 require 'spree/permission_sets'

@@ -4,10 +4,6 @@ module Spree
       isolate_namespace Spree
       engine_name 'spree'
 
-      rake_tasks do
-        load File.join(root, "lib", "tasks", "exchanges.rake")
-      end
-
       config.generators do |g|
         g.test_framework :rspec
       end
@@ -108,13 +104,14 @@ module Spree
         ]
       end
 
-      # filter sensitive information during logging
+      # Filter sensitive information during logging
       initializer "spree.params.filter", before: :load_config_initializers do |app|
         app.config.filter_parameters += [
-          :password,
-          :password_confirmation,
-          :number,
-          :verification_value]
+          %r{^password$},
+          %r{^password_confirmation$},
+          %r{^number$}, # Credit Card number
+          %r{^verification_value$} # Credit Card verification value
+        ]
       end
 
       initializer "spree.core.checking_migrations", before: :load_config_initializers do |_app|
@@ -136,5 +133,3 @@ module Spree
     end
   end
 end
-
-require 'spree/core/routes'

@@ -724,11 +724,10 @@ describe Spree::Shipment, type: :model do
       expect { shipment.reload }.to raise_error(ActiveRecord::RecordNotFound)
     end
 
-    it "cannot be destroyed when ready" do
+    it "can be destroyed when ready" do
       shipment = create(:shipment, state: "ready")
-      expect(shipment.destroy).to eq false
-      expect(shipment.errors.full_messages.join).to match /Cannot destroy/
-      expect { shipment.reload }.not_to raise_error
+      expect(shipment.destroy).to be_truthy
+      expect { shipment.reload }.to raise_error(ActiveRecord::RecordNotFound)
     end
 
     it "cannot be destroyed when shipped" do
@@ -753,6 +752,7 @@ describe Spree::Shipment, type: :model do
     before do
       stock_item.set_count_on_hand(10)
       stock_item.update_attributes!(backorderable: false)
+      inventory_unit.update_attributes!(pending: true)
     end
 
     subject { shipment.finalize! }

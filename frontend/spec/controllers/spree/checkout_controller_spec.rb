@@ -2,7 +2,7 @@ require 'spec_helper'
 
 describe Spree::CheckoutController, type: :controller do
   let(:token) { 'some_token' }
-  let(:user) { stub_model(Spree::LegacyUser) }
+  let(:user) { create(:user) }
   let(:order) { FactoryGirl.create(:order_with_totals) }
 
   let(:address_params) do
@@ -58,7 +58,7 @@ describe Spree::CheckoutController, type: :controller do
       it "should associate the order with a user" do
         order.update_column :user_id, nil
         expect(order).to receive(:associate_user!).with(user)
-        get :edit, session: { order_id: 1 }
+        get :edit
       end
     end
   end
@@ -241,7 +241,7 @@ describe Spree::CheckoutController, type: :controller do
         end
 
         it "should remove completed order from current_order" do
-          post :update, params: { state: "confirm" }, session: { order_id: "foofah" }
+          post :update, params: { state: "confirm" }
           expect(assigns(:current_order)).to be_nil
           expect(assigns(:order)).to eql controller.current_order
         end
@@ -390,7 +390,7 @@ describe Spree::CheckoutController, type: :controller do
   context "When last inventory item has been purchased" do
     let(:product) { mock_model(Spree::Product, name: "Amazing Object") }
     let(:variant) { mock_model(Spree::Variant) }
-    let(:line_item) { mock_model Spree::LineItem, insufficient_stock?: true, amount: 0 }
+    let(:line_item) { mock_model Spree::LineItem, insufficient_stock?: true, amount: 0, name: "Amazing Item" }
     let(:order) { create(:order) }
 
     before do

@@ -254,11 +254,6 @@ describe Spree::Order, type: :model do
           allow(order).to receive(:ensure_available_shipping_rates) { true }
         end
 
-        it 'should invoke set_shipment_cost' do
-          expect(order).to receive(:set_shipments_cost)
-          order.next!
-        end
-
         it 'should update shipment_total' do
           expect { order.next! }.to change{ order.shipment_total }.by(10.00)
         end
@@ -300,7 +295,6 @@ describe Spree::Order, type: :model do
         end
 
         it "transitions to payment" do
-          expect(order).to receive(:set_shipments_cost)
           order.next!
           assert_state_changed(order, 'delivery', 'payment')
           expect(order.state).to eq('payment')
@@ -333,7 +327,7 @@ describe Spree::Order, type: :model do
         context "with a shipment that has a price" do
           before do
             shipment.shipping_rates.first.update_column(:cost, 10)
-            order.set_shipments_cost
+            order.update!
           end
 
           it "transitions to payment" do
@@ -345,7 +339,6 @@ describe Spree::Order, type: :model do
         context "with a shipment that is free" do
           before do
             shipment.shipping_rates.first.update_column(:cost, 0)
-            order.set_shipments_cost
           end
 
           it "skips payment, transitions to confirm" do
@@ -362,8 +355,9 @@ describe Spree::Order, type: :model do
       let(:default_credit_card) { create(:credit_card) }
 
       before do
-        user = Spree::LegacyUser.new(email: 'spree@example.org', bill_address: user_bill_address)
-        allow(user).to receive(:default_credit_card) { default_credit_card }
+        user = create(:user, email: 'spree@example.org', bill_address: user_bill_address)
+        wallet_payment_source = user.wallet.add(default_credit_card)
+        user.wallet.default_wallet_payment_source = wallet_payment_source
         order.user = user
 
         allow(order).to receive_messages(payment_required?: true)
@@ -533,24 +527,9 @@ describe Spree::Order, type: :model do
           order.save!
         end
 
-        context 'when the exchange is for an unreturned item' do
-          before do
-            order.shipments.first.update_attributes!(created_at: order.created_at - 1.day)
-            expect(order.unreturned_exchange?).to eq true
-          end
-
-          it 'allows the order to complete' do
-            order.complete!
-
-            expect(order).to be_complete
-          end
-        end
-
-        context 'when the exchange is not for an unreturned item' do
-          it 'does not allow the order to completed' do
-            expect { order.complete! }.to raise_error Spree::Order::InsufficientStock
-            expect(order.payments.first.state).to eq('checkout')
-          end
+        it 'does not allow the order to completed' do
+          expect { order.complete! }.to raise_error Spree::Order::InsufficientStock
+          expect(order.payments.first.state).to eq('checkout')
         end
       end
     end
@@ -576,13 +555,13 @@ describe Spree::Order, type: :model do
       it "makes the current credit card a user's default credit card" do
         order.complete!
         expect(order.state).to eq 'complete'
-        expect(order.user.reload.default_credit_card.try(:id)).to eq(order.credit_cards.first.id)
+        expect(order.user.reload.wallet.default_wallet_payment_source.payment_source).to eq(order.credit_cards.first)
       end
 
-      it "does not assign a default credit card if temporary_credit_card is set" do
-        order.temporary_credit_card = true
+      it "does not assign a default credit card if temporary_payment_source is set" do
+        order.temporary_payment_source = true
         order.complete!
-        expect(order.user.reload.default_credit_card).to be_nil
+        expect(order.user.reload.wallet.default_wallet_payment_source).to be_nil
       end
     end
 
@@ -773,125 +752,6 @@ describe Spree::Order, type: :model do
     specify do
       order = Spree::Order.new
       expect(order.checkout_steps).to eq(%w(delivery confirm complete))
-    end
-  end
-
-  describe 'update_from_params' do
-    let(:order) { create(:order) }
-    let(:permitted_params) { {} }
-    let(:params) { {} }
-
-    around do |example|
-      Spree::Deprecation.silence { example.run }
-    end
-
-    it 'calls update_atributes without order params' do
-      expect {
-        order.update_from_params( params, permitted_params)
-      }.not_to change{ order.attributes }
-    end
-
-    it 'runs the callbacks' do
-      expect(order).to receive(:run_callbacks).with(:updating_from_params)
-      order.update_from_params( params, permitted_params)
-    end
-
-    context "passing a credit card" do
-      let(:permitted_params) do
-        Spree::PermittedAttributes.checkout_attributes +
-          [payments_attributes: Spree::PermittedAttributes.payment_attributes]
-      end
-
-      let(:credit_card) { create(:credit_card, user_id: order.user_id) }
-
-      let(:params) do
-        ActionController::Parameters.new(
-          order: {
-            payments_attributes: [
-              {
-                payment_method_id: 1,
-                source_attributes: attributes_for(:credit_card)
-              }
-            ],
-            existing_card: credit_card.id
-          },
-          cvc_confirm: "737"
-        )
-      end
-
-      before { order.user_id = 3 }
-
-      it "sets confirmation value when its available via :cvc_confirm" do
-        allow(Spree::CreditCard).to receive_messages find: credit_card
-        expect(credit_card).to receive(:verification_value=)
-        order.update_from_params(params, permitted_params)
-      end
-
-      it "sets existing card as source for new payment" do
-        expect {
-          order.update_from_params(params, permitted_params)
-        }.to change { Spree::Payment.count }.by(1)
-
-        expect(Spree::Payment.last.source).to eq credit_card
-      end
-
-      it "sets request_env on payment" do
-        request_env = { "USER_AGENT" => "Firefox" }
-
-        order.update_from_params(params, permitted_params, request_env)
-        expect(order.payments[0].request_env).to eq request_env
-      end
-
-      it "dont let users mess with others users cards" do
-        credit_card.update_column :user_id, 5
-
-        expect {
-          order.update_from_params(params, permitted_params)
-        }.to raise_error Spree::Core::GatewayError
-      end
-    end
-
-    context 'has params' do
-      let(:permitted_params) { [:good_param] }
-      let(:params) { ActionController::Parameters.new(order: { bad_param: 'okay' } ) }
-
-      it 'does not let through unpermitted attributes' do
-        expect(order).to receive(:assign_attributes).with(ActionController::Parameters.new.permit!)
-        order.update_from_params(params, permitted_params)
-      end
-
-      context 'has allowed params' do
-        let(:params) { ActionController::Parameters.new(order: { good_param: 'okay' } ) }
-
-        it 'accepts permitted attributes' do
-          expect(order).to receive(:assign_attributes).with(ActionController::Parameters.new("good_param" => 'okay').permit!)
-          order.update_from_params(params, permitted_params)
-        end
-      end
-
-      context 'callback returns false' do
-        before do
-          expect(order).to receive(:update_params_payment_source).and_return false
-        end
-        it 'does not let through unpermitted attributes' do
-          expect(order).not_to receive(:assign_attributes)
-          expect(order).not_to receive(:save)
-          ActiveSupport::Deprecation.silence do
-            order.update_from_params(params, permitted_params)
-          end
-        end
-      end
-
-      context 'callback throws abort' do
-        before do
-          expect(order).to receive(:update_params_payment_source).and_throw :abort
-        end
-        it 'does not let through unpermitted attributes' do
-          expect(order).not_to receive(:assign_attributes)
-          expect(order).not_to receive(:save)
-          order.update_from_params(params, permitted_params)
-        end
-      end
     end
   end
 end

@@ -107,10 +107,6 @@ module Spree
     #   @return [Boolean] Request company field for billing and shipping addresses. (default: +false+)
     preference :company, :boolean, default: false
 
-    # @!attribute [rw] create_rma_for_unreturned_exchange
-    #   @return [Boolean] allows rma to be created for items after unreturned exchange charge has been made (default: +false+)
-    preference :create_rma_for_unreturned_exchange, :boolean, default: false
-
     # @!attribute [rw] currency
     #   Currency to use by default when not defined on the site (default: +"USD"+)
     #   @return [String] ISO 4217 Three letter currency code
@@ -131,21 +127,6 @@ module Spree
     #   @return [String, nil] Two-letter ISO code of that {Spree::Country} for which
     #      prices are entered in the backend (default: nil)
     preference :admin_vat_country_iso, :string, default: nil
-
-    # @!attribute [rw] expedited_exchanges
-    #   Kicks off an exchange shipment upon return authorization save.
-    #   charge customer if they do not return items within timely manner.
-    #   @note this requires payment profiles to be supported on your gateway of
-    #     choice as well as a delayed job handler to be configured with
-    #     activejob.
-    #   @return [Boolean] Use expidited exchanges (default: +false+)
-    preference :expedited_exchanges, :boolean, default: false
-
-    # @!attribute [rw] expedited_exchanges_days_window
-    #   @return [Integer] Number of days the customer has to return their item
-    #     after the expedited exchange is shipped in order to avoid being
-    #     charged (default: +14+)
-    preference :expedited_exchanges_days_window, :integer, default: 14
 
     # @!attribute [rw] generate_api_key_for_all_roles
     #   @return [Boolean] Allow generating api key automatically for user
@@ -403,28 +384,6 @@ module Spree
       @default_tax_location ||= Spree::Tax::TaxLocation.new(
         country: Spree::Country.find_by(iso: admin_vat_country_iso)
       )
-    end
-
-    # all the following can be deprecated when store prefs are no longer supported
-    # @private
-    DEPRECATED_STORE_PREFERENCES = {
-      site_name: :name,
-      site_url: :url,
-      default_meta_description: :meta_description,
-      default_meta_keywords: :meta_keywords,
-      default_seo_title: :seo_title
-    }
-
-    DEPRECATED_STORE_PREFERENCES.each do |old_preference_name, store_method|
-      # Avoid warning about implementation details
-      bc = ActiveSupport::BacktraceCleaner.new
-      bc.add_silencer { |line| line =~ %r{spree/preferences} }
-
-      # support all the old preference methods with a warning
-      define_method "preferred_#{old_preference_name}" do
-        Spree::Deprecation.warn("#{old_preference_name} is no longer supported on Spree::Config, please access it through #{store_method} on Spree::Store", bc.clean(caller))
-        Spree::Store.default.send(store_method)
-      end
     end
   end
 end

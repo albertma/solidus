@@ -18,7 +18,7 @@ module Spree
       end
 
       def new
-        @payment = @order.payments.build
+        @payment = @order.payments.build(amount: @order.outstanding_balance)
       end
 
       def create
@@ -78,7 +78,7 @@ module Spree
 
       def load_data
         @amount = params[:amount] || load_order.total
-        @payment_methods = Spree::PaymentMethod.available_to_admin
+        @payment_methods = Spree::PaymentMethod.active.available_to_admin
         if @payment && @payment.payment_method
           @payment_method = @payment.payment_method
         else

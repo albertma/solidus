@@ -19,7 +19,7 @@ module Spree
 
         content_tag :ol, class: 'breadcrumb' do
           safe_join admin_breadcrumbs.map { |level|
-            content_tag(:li, level, class: "separator #{level == admin_breadcrumbs.last ? 'active' : ''}")
+            content_tag(:li, level, class: "breadcrumb-item #{level == admin_breadcrumbs.last ? 'active' : ''}")
           }
         end
       end
@@ -30,7 +30,7 @@ module Spree
         elsif content_for?(:page_title)
           content_for(:page_title)
         elsif admin_breadcrumbs.any?
-          strip_tags(admin_breadcrumbs.last)
+          admin_breadcrumbs.map{ |x| strip_tags(x) }.reverse.join(' - ')
         else
           Spree.t(controller.controller_name, default: controller.controller_name.titleize)
         end

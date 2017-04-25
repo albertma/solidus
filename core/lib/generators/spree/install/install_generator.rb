@@ -149,23 +149,24 @@ Spree::Auth::Engine.load_seed if defined?(Spree::Auth)
       end
     end
 
-    def notify_about_routes
+    def install_routes
       insert_into_file File.join('config', 'routes.rb'), after: "Rails.application.routes.draw do\n" do
-        %{
+        <<-ROUTES
   # This line mounts Spree's routes at the root of your application.
   # This means, any requests to URLs such as /products, will go to Spree::ProductsController.
   # If you would like to change where this engine is mounted, simply change the :at option to something different.
   #
   # We ask that you don't use the :as option here, as Spree relies on it being the default of "spree"
-  mount Spree::Core::Engine, :at => '/'
-        }
+  mount Spree::Core::Engine, at: '/'
+
+        ROUTES
       end
 
       unless options[:quiet]
         puts "*" * 50
         puts "We added the following line to your application's config/routes.rb file:"
         puts " "
-        puts "    mount Spree::Core::Engine, :at => '/'"
+        puts "    mount Spree::Core::Engine, at: '/'"
       end
     end
 

@@ -29,6 +29,8 @@ en:
         code: Code
         name: Name
         state: State
+      spree/calculator/flat_rate:
+        preferred_amount: Amount
       spree/calculator/tiered_flat_rate:
         preferred_base_amount: Base Amount
         preferred_tiers: Tiers
@@ -166,12 +168,12 @@ en:
         code: Code
         description: Description
         event_name: Event Name
-        expires_at: Expiration
+        expires_at: Expiration date
         name: Name
         path: Path
         per_code_usage_limit: Per Code Usage Limit
         promotion_uses: Promotion Uses
-        starts_at: Starts
+        starts_at: Start date
         usage_limit: Overall Usage Limit
       spree/promotion_category:
         name: Name
@@ -468,6 +470,12 @@ en:
       spree/promotion_category:
         one: Promotion Category
         other: Promotion Categories
+      spree/promotion_code_batch:
+        one: Promotion Code Batch
+        other: Promotion Code Batches
+      spree/promotion_code:
+        one: Promotion Code
+        other: Promotion Codes
       spree/property:
         one: Property Type
         other: Property Types
@@ -517,6 +525,9 @@ en:
       spree/stock_transfer:
         one: Stock Transfer
         other: Stock Transfers
+      spree/store:
+        one: Store
+        other: Stores
       spree/store_credit:
         one: Store Credit
         other: Store Credits
@@ -621,6 +632,10 @@ en:
           attributes:
             user_id:
               default_address_exists: "already has a default address"
+        spree/wallet_payment_source:
+          attributes:
+            payment_source:
+              has_to_be_payment_source_class: "has to be a Spree::PaymentSource"
 
   devise:
     confirmations:
@@ -642,7 +657,7 @@ en:
       unlock_instructions:
         subject: Unlock Instructions
     oauth_callbacks:
-      failure: Could not authorize you from %{kind} because "%{reason}".
+      failure: "Could not authorize you from %{kind} because %{reason}."
       success: Successfully authorized from %{kind} account.
     unlocks:
       send_instructions: You will receive an email with instructions about how to unlock your account in a few minutes.
@@ -688,14 +703,13 @@ en:
       list: List
       listing: Listing
       new: New
-      refund: Refund
       receive: Receive
+      refund: Refund
       remove: Remove
       save: Save
-      ship: ship
-      update: Update
+      ship: Ship
       split: Split
-      ship: ship
+      update: Update
     activate: Activate
     active: Active
     add: Add
@@ -703,6 +717,7 @@ en:
     add_action_of_type: Add action of type
     add_country: Add Country
     add_coupon_code: Add Coupon Code
+    add_line_item: Add Item
     add_new_header: Add New Header
     add_new_style: Add New Style
     add_one: Add One
@@ -743,8 +758,8 @@ en:
     adjustment_total: Adjustment Total
     adjustments: Adjustments
     admin:
-      general_settings:
-        edit:
+      stores:
+        form:
           no_cart_tax_country: "No taxes on carts without address"
       images:
         index:
@@ -770,6 +785,17 @@ en:
         form:
           starts_at_placeholder: Immediately
           expires_at_placeholder: Never
+          activation: Activation
+          general: General
+        activations_new:
+          auto: Apply to all orders
+          multiple_codes: Multiple promotion codes
+          path: URL Path
+          single_code: Single promotion code
+        activations_edit:
+          auto: All orders will attempt to use this promotion
+          single_code_html: "This promotion uses the promotion code: <code>%{code}</code>"
+          multiple_codes_html: "This promotion uses %{count} promotion codes"
       store_credits:
         add: "Add store credit"
         amount_authorized: "Amount Authorized"
@@ -816,7 +842,6 @@ en:
         checkout: Refunds and Returns
         configuration: Configuration
         display_order: Display Order
-        general: Store
         option_types: Option Types
         orders: Orders
         overview: Overview
@@ -832,6 +857,7 @@ en:
         stock: Stock
         stock_items: Store Stock
         stock_transfers: Stock Transfers
+        stores: Stores
         taxes: Taxes
         taxonomies: Taxonomies
         taxons: Taxons
@@ -1168,7 +1194,6 @@ en:
     exceptions:
       count_on_hand_setter: Cannot set count_on_hand manually, as it is set automatically by the recalculate_count_on_hand callback. Please use `update_column(:count_on_hand, value)` instead.
     exchange_for: Exchange for
-    expedited_exchanges_warning: "Any specified exchanges will ship to the customer immediately upon saving. The customer will be charged the full amount of the item if they do not return the original item within %{days_window} days."
     excl: excl.
     expected: Expected
     expected_items: Expected Items
@@ -1280,7 +1305,7 @@ en:
     inventory: Inventory
     inventory_adjustment: Inventory Adjustment
     inventory_canceled: Inventory canceled
-    inventory_error_flash_for_insufficient_quantity: An item in your cart has become unavailable.
+    inventory_error_flash_for_insufficient_quantity: "#{names} became unavailable."
     inventory_not_available: Inventory not available for %{item}.
     inventory_state: Inventory State
     inventory_states:
@@ -1376,6 +1401,7 @@ en:
     new_product: New Product
     new_promotion: New Promotion
     new_promotion_category: New Promotion Category
+    new_promotion_code_batch: New Promotion Code Batch
     new_property: New Property Type
     new_refund: New Refund
     new_refund_reason: New Refund Reason
@@ -1389,6 +1415,7 @@ en:
     new_stock_movement: New Stock Movement
     new_stock_transfer: New Stock Transfer
     new_store_credit: New Store Credit
+    new_store: New Store
     new_tax_category: New Tax Category
     new_tax_rate: New Tax Rate
     new_taxon: New Taxon
@@ -1599,6 +1626,17 @@ en:
         description: Makes all shipments for the order free
         name: Free shipping
     promotion_actions: Actions
+    promotion_code_batch_mailer:
+      promotion_code_batch_finished:
+        subject: Promotion code batch finished
+        message: "All %{number_of_codes} codes have been created for promotion: "
+      promotion_code_batch_errored:
+        subject: Promotion code batch errored
+        message: "Promotion code batch errored (%{error}) for promotion: "
+    promotion_code_batches:
+      errored: "Errored: %{error}"
+      finished: "All %{number_of_codes} codes have been created."
+      processing: "Processing: %{number_of_codes_processed} / %{number_of_codes}"
     promotion_form:
       match_policies:
         all: Match all of these rules

@@ -17,6 +17,7 @@ module Spree
     def update
       @order.transaction do
         update_item_count
+        update_shipment_amounts
         update_totals
         if order.completed?
           update_payment_state
@@ -30,88 +31,6 @@ module Spree
 
     def run_hooks
       update_hooks.each { |hook| order.send hook }
-    end
-
-    # This will update and select the best promotion adjustment, update tax
-    # adjustments, update cancellation adjustments, and then update the total
-    # fields (promo_total, included_tax_total, additional_tax_total, and
-    # adjustment_total) on the item.
-    # @return [void]
-    def recalculate_adjustments
-      # Promotion adjustments must be applied first, then tax adjustments.
-      # This fits the criteria for VAT tax as outlined here:
-      # http://www.hmrc.gov.uk/vat/managing/charging/discounts-etc.htm#1
-      # It also fits the criteria for sales tax as outlined here:
-      # http://www.boe.ca.gov/formspubs/pub113/
-      update_item_promotions
-      update_order_promotions
-      update_taxes
-      update_cancellations
-      update_item_totals
-    end
-
-    # Updates the following Order total values:
-    #
-    # +payment_total+      The total value of all finalized Payments (NOTE: non-finalized Payments are excluded)
-    # +item_total+         The total value of all LineItems
-    # +adjustment_total+   The total value of all adjustments (promotions, credits, etc.)
-    # +promo_total+        The total value of all promotion adjustments
-    # +total+              The so-called "order total."  This is equivalent to +item_total+ plus +adjustment_total+.
-    def update_totals
-      update_payment_total
-      update_item_total
-      update_shipment_total
-      update_adjustment_total
-    end
-
-    # give each of the shipments a chance to update themselves
-    def update_shipments
-      shipments.each do |shipment|
-        next unless shipment.persisted?
-        shipment.update!(order)
-        shipment.refresh_rates
-        shipment.update_amounts
-      end
-    end
-
-    def update_payment_total
-      order.payment_total = payments.completed.includes(:refunds).map { |payment| payment.amount - payment.refunds.sum(:amount) }.sum
-    end
-
-    def update_shipment_total
-      order.shipment_total = shipments.to_a.sum(&:cost)
-      update_order_total
-    end
-
-    def update_order_total
-      order.total = order.item_total + order.shipment_total + order.adjustment_total
-    end
-
-    def update_adjustment_total
-      recalculate_adjustments
-
-      all_items = line_items + shipments
-
-      order.adjustment_total = all_items.sum(&:adjustment_total) + adjustments.select(&:eligible?).sum(&:amount)
-      order.included_tax_total = all_items.sum(&:included_tax_total)
-      order.additional_tax_total = all_items.sum(&:additional_tax_total)
-
-      order.promo_total = all_items.sum(&:promo_total) + adjustments.select(&:eligible?).select(&:promotion?).sum(&:amount)
-
-      update_order_total
-    end
-
-    def update_item_count
-      order.item_count = line_items.to_a.sum(&:quantity)
-    end
-
-    def update_item_total
-      order.item_total = line_items.to_a.sum(&:amount)
-      update_order_total
-    end
-
-    def persist_totals
-      order.save!(validate: false)
     end
 
     # Updates the +shipment_state+ attribute according to the following logic:
@@ -172,6 +91,91 @@ module Spree
     end
 
     private
+
+    # This will update and select the best promotion adjustment, update tax
+    # adjustments, update cancellation adjustments, and then update the total
+    # fields (promo_total, included_tax_total, additional_tax_total, and
+    # adjustment_total) on the item.
+    # @return [void]
+    def recalculate_adjustments
+      # Promotion adjustments must be applied first, then tax adjustments.
+      # This fits the criteria for VAT tax as outlined here:
+      # http://www.hmrc.gov.uk/vat/managing/charging/discounts-etc.htm#1
+      # It also fits the criteria for sales tax as outlined here:
+      # http://www.boe.ca.gov/formspubs/pub113/
+      update_item_promotions
+      update_order_promotions
+      update_taxes
+      update_cancellations
+      update_item_totals
+    end
+
+    # Updates the following Order total values:
+    #
+    # +payment_total+      The total value of all finalized Payments (NOTE: non-finalized Payments are excluded)
+    # +item_total+         The total value of all LineItems
+    # +adjustment_total+   The total value of all adjustments (promotions, credits, etc.)
+    # +promo_total+        The total value of all promotion adjustments
+    # +total+              The so-called "order total."  This is equivalent to +item_total+ plus +adjustment_total+.
+    def update_totals
+      update_payment_total
+      update_item_total
+      update_shipment_total
+      update_adjustment_total
+    end
+
+    def update_shipment_amounts
+      shipments.each do |shipment|
+        shipment.update_amounts
+      end
+    end
+
+    # give each of the shipments a chance to update themselves
+    def update_shipments
+      shipments.each do |shipment|
+        shipment.update!(order)
+      end
+    end
+
+    def update_payment_total
+      order.payment_total = payments.completed.includes(:refunds).map { |payment| payment.amount - payment.refunds.sum(:amount) }.sum
+    end
+
+    def update_shipment_total
+      order.shipment_total = shipments.to_a.sum(&:cost)
+      update_order_total
+    end
+
+    def update_order_total
+      order.total = order.item_total + order.shipment_total + order.adjustment_total
+    end
+
+    def update_adjustment_total
+      recalculate_adjustments
+
+      all_items = line_items + shipments
+
+      order.adjustment_total = all_items.sum(&:adjustment_total) + adjustments.select(&:eligible?).sum(&:amount)
+      order.included_tax_total = all_items.sum(&:included_tax_total)
+      order.additional_tax_total = all_items.sum(&:additional_tax_total)
+
+      order.promo_total = all_items.sum(&:promo_total) + adjustments.select(&:eligible?).select(&:promotion?).sum(&:amount)
+
+      update_order_total
+    end
+
+    def update_item_count
+      order.item_count = line_items.to_a.sum(&:quantity)
+    end
+
+    def update_item_total
+      order.item_total = line_items.to_a.sum(&:amount)
+      update_order_total
+    end
+
+    def persist_totals
+      order.save!(validate: false)
+    end
 
     def round_money(n)
       (n * 100).round / 100.0
