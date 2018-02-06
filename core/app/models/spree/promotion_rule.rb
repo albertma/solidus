@@ -30,6 +30,10 @@ module Spree
       @eligibility_errors ||= ActiveModel::Errors.new(self)
     end
 
+    def to_partial_path
+      "spree/admin/promotions/rules/#{model_name.element}"
+    end
+
     private
 
     def unique_per_promotion
@@ -39,7 +43,7 @@ module Spree
     end
 
     def eligibility_error_message(key, options = {})
-      Spree.t(key, Hash[scope: [:eligibility_errors, :messages]].merge(options))
+      I18n.t(key, { scope: [:spree, :eligibility_errors, :messages] }.merge(options))
     end
   end
 end

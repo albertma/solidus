@@ -10,6 +10,8 @@ module Spree
 
     class_methods do
       def calculators
+        Spree::Deprecation.warn("Calling .calculators is deprecated. Please access through Rails.application.config.spree.calculators")
+
         spree_calculators.send model_name_without_spree_namespace
       end
 
@@ -20,7 +22,7 @@ module Spree
       end
 
       def spree_calculators
-        Rails.application.config.spree.calculators
+        Spree::Config.environment.calculators
       end
     end
 
@@ -30,7 +32,7 @@ module Spree
 
     def calculator_type=(calculator_type)
       klass = calculator_type.constantize if calculator_type
-      self.calculator = klass.new if klass && !calculator.is_a?(klass)
+      self.calculator = klass.new if klass && !calculator.instance_of?(klass)
     end
   end
 end

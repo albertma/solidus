@@ -1,9 +1,11 @@
-.select2-container {
+.select2-container,
+.select2-container.select2-drop-above {
   .select2-choice, .select2-choices {
     border: $input-btn-border-width solid $input-border-color;
-    @include border-radius($input-border-radius);
+    border-radius: $input-border-radius;
     background: $input-bg;
-    height: calc(#{$input-height} + #{2*$input-btn-border-width});
+    height: $input-height;
+    padding: 0;
 
     .select2-arrow {
       background: transparent;
@@ -17,8 +19,23 @@
     }
 
     >.select2-chosen {
-      line-height: $input-height;
+      padding: $input-btn-padding-y $input-btn-padding-x;
+      line-height: $input-btn-line-height;
       color: $input-color;
+    }
+  }
+}
+
+.select2-container.select2-dropdown-open {
+  .select2-choice,
+  .select2-choices {
+    border-radius: $input-border-radius $input-border-radius 0 0;
+  }
+
+  &.select2-drop-above {
+    .select2-choice,
+    .select2-choices {
+      border-radius: 0 0 $input-border-radius $input-border-radius;
     }
   }
 }
@@ -35,11 +52,13 @@
   background-image: none;
 }
 
-.select2-container-active, .select2-dropdown-open {
+.select2-container-active, .select2-dropdown-open,
+.select2-container-active.select2-drop-above,
+.select2-dropdown-open.select2-drop-above {
   .select2-choices.select2-choices, /* Needs extra specificity */
   .select2-choice {
     box-shadow: none; /* Remove default outline */
-    border-color: $input-border-focus;
+    border-color: $input-focus-border-color;
   }
 }
 
@@ -49,7 +68,7 @@
   }
 
   .select2-search-choice {
-    background: $badge-default-bg;
+    background: $gray-200;
     border: 0;
     margin: 2px 0 3px 5px; // adjust the margin to respect the adjusted line height
   }
@@ -69,11 +88,19 @@
 .select2-drop {
   /* Remove default shadow */
   box-shadow: none;
-}
 
-.select2-drop-active {
-  border: $input-btn-border-width solid $input-border-focus;
-  border-top: 0;
+  &.select2-drop-active,
+  &.select2-drop-active.select2-drop-above {
+    border: $input-btn-border-width solid $input-focus-border-color;
+  }
+
+  &.select2-drop-active {
+    border-top: 0;
+
+    &.select2-drop-above {
+      border-bottom: 0;
+    }
+  }
 }
 
 .select2-results {

@@ -1,4 +1,5 @@
-require 'spec_helper'
+require 'rails_helper'
+require 'spree/preferences/statically_configurable'
 
 module Spree
   RSpec.describe Preferences::StaticallyConfigurable do

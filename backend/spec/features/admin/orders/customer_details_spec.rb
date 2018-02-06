@@ -24,7 +24,6 @@ describe "Customer Details", type: :feature, js: true do
       visit spree.admin_path
       click_link "Orders"
       click_link "New Order"
-      click_on 'Cart'
 
       add_line_item product.name, quantity: quantity
 
@@ -49,13 +48,20 @@ describe "Customer Details", type: :feature, js: true do
       expect(Spree::Order.last.user).not_to be_nil
     end
 
+    # Regression test for https://github.com/solidusio/solidus/pull/2176
+    it "does not reset guest checkout to true when returning to customer tab" do
+      click_button "Update"
+      click_link "Customer"
+      expect(find('#guest_checkout_true')).not_to be_checked
+    end
+
     context "when required quantity is more than available" do
       let(:quantity) { 11 }
       let!(:product) { create(:product_not_backorderable) }
 
       it "displays an error" do
         click_button "Update"
-        expect(page).to have_content Spree.t(:insufficient_stock_for_order)
+        expect(page).to have_content I18n.t('spree.insufficient_stock_for_order')
       end
     end
   end
@@ -79,7 +85,7 @@ describe "Customer Details", type: :feature, js: true do
         click_link "Customer"
 
         within("#billing") do
-          targetted_select2 "Brazil", from: "#s2id_order_bill_address_attributes_country_id"
+          select "Brazil", from: "Country"
           fill_in "order_bill_address_attributes_state_name", with: "Piaui"
         end
 
@@ -95,8 +101,8 @@ describe "Customer Details", type: :feature, js: true do
       order.save!
 
       click_link "Customer"
-      within("#shipping") { fill_in_address "ship" }
-      within("#billing") { fill_in_address "bill" }
+      within("#shipping") { fill_in_address }
+      within("#billing") { fill_in_address }
 
       click_button "Update"
       click_link "Customer"
@@ -104,7 +110,7 @@ describe "Customer Details", type: :feature, js: true do
       # Regression test for https://github.com/spree/spree/issues/2950 and https://github.com/spree/spree/issues/2433
       # This act should transition the state of the order as far as it will go too
       within("#order_tab_summary") do
-        expect(find("dt#order_status + dd")).to have_content("complete")
+        expect(find("dt#order_status + dd")).to have_content("Complete")
       end
     end
 
@@ -115,14 +121,29 @@ describe "Customer Details", type: :feature, js: true do
       expect(page).to have_content("Shipping address first name can't be blank")
     end
 
-    it "updates order email for an existing order with a user" do
-      order.update_columns(ship_address_id: ship_address.id, bill_address_id: bill_address.id, state: "confirm", completed_at: nil)
-      previous_user = order.user
-      click_link "Customer"
-      fill_in "order_email", with: "newemail@example.com"
-      expect { click_button "Update" }.to change { order.reload.email }.to "newemail@example.com"
-      expect(order.user_id).to eq previous_user.id
-      expect(order.user.email).to eq previous_user.email
+    context "for an order in confirm state with a user" do
+      let(:user) { order.user }
+
+      before do
+        order.update_columns(
+          ship_address_id: ship_address.id,
+          bill_address_id: bill_address.id,
+          state: "confirm",
+          completed_at: nil
+        )
+      end
+
+      it "updating order email works" do
+        click_link "Customer"
+        fill_in "order_email", with: "newemail@example.com"
+        click_button "Update"
+        expect(page).to have_content 'Customer Details Updated'
+        click_link "Customer"
+        expect(page).to have_field 'Customer E-Mail', with: order.reload.email
+        within '#order_user_link' do
+          expect(page).to have_link user.email
+        end
+      end
     end
 
     context "country associated was removed" do
@@ -136,6 +157,7 @@ describe "Customer Details", type: :feature, js: true do
       end
 
       it "sets default country when displaying form" do
+        click_link "Cart"
         click_link "Customer"
         expect(page).to have_field("order_bill_address_attributes_country_id", with: brazil.id, visible: false)
       end
@@ -158,18 +180,17 @@ describe "Customer Details", type: :feature, js: true do
         fill_in "order_ship_address_attributes_city",       with: "Bethesda"
         fill_in "order_ship_address_attributes_zipcode",    with: "20170"
 
-        select_state('Alabama', 'ship')
+        within("#shipping") do
+          select 'Alabama', from: "State"
+        end
+
         fill_in "order_ship_address_attributes_phone", with: "123-456-7890"
         click_button "Update"
       end
     end
   end
 
-  def select_state(state_name, kind = "bill")
-    targetted_select2 state_name, from: "#s2id_order_#{kind}_address_attributes_state_id"
-  end
-
-  def fill_in_address(kind = "bill")
+  def fill_in_address
     fill_in "First Name",              with: "John 99"
     fill_in "Last Name",               with: "Doe"
     fill_in "Company",                 with: "Company"
@@ -177,7 +198,7 @@ describe "Customer Details", type: :feature, js: true do
     fill_in "Street Address (cont'd)", with: "#101"
     fill_in "City",                    with: "Bethesda"
     fill_in "Zip Code",                with: "20170"
-    select_state("Alabama", kind)
+    select 'Alabama', from: "State"
     fill_in "Phone",                   with: "123-456-7890"
   end
 end

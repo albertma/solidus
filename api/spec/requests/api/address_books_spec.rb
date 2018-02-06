@@ -119,9 +119,7 @@ module Spree
     context 'on behalf of address book owner' do
       context 'with ability' do
         before do
-          Spree::RoleConfiguration.configure do |config|
-            config.assign_permissions 'Prefect', [Spree::PermissionSets::UserManagement]
-          end
+          Spree::Config.roles.assign_permissions 'Prefect', [Spree::PermissionSets::UserManagement]
           create(:user, spree_api_key: 'galleon', spree_roles: [build(:role, name: 'Prefect')])
         end
 
@@ -131,7 +129,7 @@ module Spree
           other_user.save_in_address_book(ron_address_attributes, false)
 
           get "/api/users/#{other_user.id}/address_book",
-          headers: { 'X-SPREE-TOKEN' => 'galleon' }
+            headers: { 'X-SPREE-TOKEN' => 'galleon' }
 
           json_response = JSON.parse(response.body)
           expect(response.status).to eq(200)

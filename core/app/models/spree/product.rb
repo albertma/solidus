@@ -1,3 +1,5 @@
+require 'discard'
+
 module Spree
   # Products represent an entity for sale in a store. Products can have
   # variations, called variants. Product properties include description,
@@ -12,6 +14,18 @@ module Spree
     friendly_id :slug_candidates, use: :history
 
     acts_as_paranoid
+    include Spree::ParanoiaDeprecations
+
+    include Discard::Model
+    self.discard_column = :deleted_at
+
+    after_discard do
+      variants_including_master.discard_all
+      self.product_option_types = []
+      self.product_properties = []
+      self.classifications = []
+      self.product_promotion_rules = []
+    end
 
     has_many :product_option_types, dependent: :destroy, inverse_of: :product
     has_many :option_types, through: :product_option_types
@@ -60,27 +74,41 @@ module Spree
     end
 
     MASTER_ATTRIBUTES = [
-      :rebuild_vat_prices, :sku, :price, :currency, :display_amount, :display_price, :weight,
-      :height, :width, :depth, :cost_currency, :price_in, :price_for, :amount_in, :cost_price
+      :cost_currency,
+      :cost_price,
+      :depth,
+      :height,
+      :price,
+      :sku,
+      :weight,
+      :width,
     ]
     MASTER_ATTRIBUTES.each do |attr|
       delegate :"#{attr}", :"#{attr}=", to: :find_or_build_master
     end
 
-    delegate :display_amount, :display_price, :has_default_price?, to: :find_or_build_master
+    delegate :amount_in,
+             :display_amount,
+             :display_price,
+             :has_default_price?,
+             :images,
+             :price_for,
+             :price_in,
+             :rebuild_vat_prices=,
+             to: :find_or_build_master
 
-    delegate :images, to: :master, prefix: true
-    alias_method :images, :master_images
+    alias_method :master_images, :images
 
     has_many :variant_images, -> { order(:position) }, source: :images, through: :variants_including_master
 
     after_create :build_variants_from_option_values_hash, if: :option_values_hash
 
     after_destroy :punch_slug
+    after_discard :punch_slug
 
     after_initialize :ensure_master
 
-    after_save :run_touch_callbacks, if: :changed?
+    after_save :run_touch_callbacks, if: :saved_changes?
     after_touch :touch_taxons
 
     before_validation :normalize_slug, on: :update
@@ -102,6 +130,10 @@ module Spree
 
     self.whitelisted_ransackable_associations = %w[stores variants_including_master master variants]
     self.whitelisted_ransackable_attributes = %w[slug]
+
+    def self.ransackable_scopes(_auth_object = nil)
+      %i(with_deleted with_variant_sku_cont)
+    end
 
     # @return [Boolean] true if there are any variants
     def has_variants?
@@ -339,10 +371,12 @@ module Spree
     # Iterate through this products taxons and taxonomies and touch their timestamps in a batch
     def touch_taxons
       taxons_to_touch = taxons.map(&:self_and_ancestors).flatten.uniq
-      Spree::Taxon.where(id: taxons_to_touch.map(&:id)).update_all(updated_at: Time.current)
+      unless taxons_to_touch.empty?
+        Spree::Taxon.where(id: taxons_to_touch.map(&:id)).update_all(updated_at: Time.current)
 
-      taxonomy_ids_to_touch = taxons_to_touch.map(&:taxonomy_id).flatten.uniq
-      Spree::Taxonomy.where(id: taxonomy_ids_to_touch).update_all(updated_at: Time.current)
+        taxonomy_ids_to_touch = taxons_to_touch.map(&:taxonomy_id).flatten.uniq
+        Spree::Taxonomy.where(id: taxonomy_ids_to_touch).update_all(updated_at: Time.current)
+      end
     end
 
     def remove_taxon(taxon)

@@ -1,12 +1,12 @@
-require 'spec_helper'
+require 'rails_helper'
 
-describe Spree::Payment, type: :model do
+RSpec.describe Spree::Payment, type: :model do
   let(:store) { create :store }
   let(:order) { Spree::Order.create(store: store) }
   let(:refund_reason) { create(:refund_reason) }
 
   let(:gateway) do
-    gateway = Spree::Gateway::Bogus.new(active: true, name: 'Bogus gateway')
+    gateway = Spree::PaymentMethod::BogusCreditCard.new(active: true, name: 'Bogus gateway')
     allow(gateway).to receive_messages source_required: true
     gateway
   end
@@ -209,7 +209,7 @@ describe Spree::Payment, type: :model do
       # Regression test for https://github.com/spree/spree/issues/4598
       it "should allow payments with a gateway_customer_profile_id" do
         payment.source.update!(gateway_customer_profile_id: "customer_1", brand: 'visa')
-        expect(payment.payment_method.provider_class).to receive(:supports?).with('visa').and_return(false)
+        expect(payment.payment_method.gateway_class).to receive(:supports?).with('visa').and_return(false)
         expect(payment).to receive(:started_processing!)
         payment.process!
       end
@@ -217,7 +217,7 @@ describe Spree::Payment, type: :model do
       # Another regression test for https://github.com/spree/spree/issues/4598
       it "should allow payments with a gateway_payment_profile_id" do
         payment.source.update!(gateway_payment_profile_id: "customer_1", brand: 'visa')
-        expect(payment.payment_method.provider_class).to receive(:supports?).with('visa').and_return(false)
+        expect(payment.payment_method.gateway_class).to receive(:supports?).with('visa').and_return(false)
         expect(payment).to receive(:started_processing!)
         payment.process!
       end
@@ -481,25 +481,34 @@ describe Spree::Payment, type: :model do
     end
 
     describe "#cancel!" do
+      subject { payment.cancel! }
+
       before do
         payment.response_code = 'abc'
         payment.state = 'pending'
       end
 
-      context "if successful" do
+      context "if void returns successful response" do
+        before do
+          expect(gateway).to receive(:try_void) { success_response }
+        end
+
+        it "should update the state to void" do
+          expect { subject }.to change { payment.state }.to('void')
+        end
+
         it "should update the response_code with the authorization from the gateway" do
-          # Change it to something different
-          allow(gateway).to receive_messages cancel: success_response
-          payment.cancel!
-          expect(payment.state).to eq('void')
-          expect(payment.response_code).to eq('123')
+          expect { subject }.to change { payment.response_code }.to('123')
         end
       end
 
-      context "if unsuccessful" do
-        it "should not void the payment" do
-          allow(gateway).to receive_messages cancel: failed_response
-          expect { payment.cancel! }.to raise_error(Spree::Core::GatewayError)
+      context "if void returns failed response" do
+        before do
+          expect(gateway).to receive(:try_void) { failed_response }
+        end
+
+        it "should raise gateway error and not change payment state or response_code", :aggregate_failures do
+          expect { subject }.to raise_error(Spree::Core::GatewayError)
           expect(payment.state).to eq('pending')
           expect(payment.response_code).to eq('abc')
         end
@@ -580,7 +589,7 @@ describe Spree::Payment, type: :model do
       end
 
       specify do
-        expect { payment.process! }.to raise_error(Spree::Core::GatewayError, Spree.t(:payment_processing_failed))
+        expect { payment.process! }.to raise_error(Spree::Core::GatewayError, I18n.t('spree.payment_processing_failed'))
       end
     end
   end
@@ -621,6 +630,25 @@ describe Spree::Payment, type: :model do
     end
   end
 
+  describe "#fully_refunded?" do
+    subject { payment.fully_refunded? }
+
+    before { payment.amount = 100 }
+
+    context 'before refund' do
+      it { is_expected.to be false }
+    end
+
+    context 'when refund total equals payment amount' do
+      before do
+        create(:refund, payment: payment, amount: 50)
+        create(:refund, payment: payment, amount: 50)
+      end
+
+      it { is_expected.to be true }
+    end
+  end
+
   describe "#save" do
     context "captured payments" do
       it "update order payment total" do
@@ -653,12 +681,13 @@ describe Spree::Payment, type: :model do
     end
 
     context "completed orders" do
+      let(:payment_method) { create(:check_payment_method) }
       before { allow(order).to receive_messages completed?: true }
 
       it "updates payment_state and shipments" do
         expect(order.updater).to receive(:update_payment_state)
         expect(order.updater).to receive(:update_shipment_state)
-        Spree::Payment.create(amount: 100, order: order)
+        Spree::Payment.create!(amount: 100, order: order, payment_method: payment_method)
       end
     end
 
@@ -741,13 +770,61 @@ describe Spree::Payment, type: :model do
       expect(payment.reload.state).to eq('checkout')
     end
 
+    context 'with order having other payments' do
+      let!(:existing_payment) do
+        create(:payment,
+          payment_method: existing_payment_method,
+          source: existing_payment_source,
+          order: order,
+          amount: 5)
+      end
+
+      let(:payment_method) { create(:payment_method) }
+      let(:payment_source) { create(:credit_card) }
+      let(:payment) do
+        build(:payment,
+          payment_method: payment_method,
+          source: payment_source,
+          order: order,
+          amount: 5)
+      end
+
+      context 'that are store credit payments' do
+        let(:existing_payment_method) { create(:store_credit_payment_method) }
+        let(:existing_payment_source) { create(:store_credit) }
+
+        it 'does not invalidate existing payments' do
+          expect { payment.save! }.to_not change { order.payments.with_state(:invalid).count }
+        end
+
+        context 'when payment itself is a store credit payment' do
+          let(:payment_method) { existing_payment_method }
+          let(:payment_source) { existing_payment_source }
+
+          it 'does not invalidate existing payments' do
+            expect { payment.save! }.to_not change { order.payments.with_state(:invalid).count }
+          end
+        end
+      end
+
+      context 'that are not store credit payments' do
+        let(:existing_payment_method) { create(:payment_method) }
+        let(:existing_payment_source) { create(:credit_card) }
+
+        it 'invalidates existing payments' do
+          expect { payment.save! }.to change { order.payments.with_state(:invalid).count }
+        end
+      end
+    end
+
     describe "invalidating payments updates in memory objects" do
+      let(:payment_method) { create(:check_payment_method) }
       before do
-        Spree::PaymentCreate.new(order, amount: 1).build.save!
+        Spree::PaymentCreate.new(order, amount: 1, payment_method_id: payment_method.id).build.save!
         expect(order.payments.map(&:state)).to contain_exactly(
           'checkout'
         )
-        Spree::PaymentCreate.new(order, amount: 2).build.save!
+        Spree::PaymentCreate.new(order, amount: 2, payment_method_id: payment_method.id).build.save!
       end
 
       it 'should not have stale payments' do
@@ -797,8 +874,8 @@ describe Spree::Payment, type: :model do
         payment = Spree::PaymentCreate.new(order, params).build
         expect(payment).not_to be_valid
         expect(payment.source).not_to be_nil
-        expect(payment.source.error_on(:number).size).to eq(1)
-        expect(payment.source.error_on(:verification_value).size).to eq(1)
+        expect(payment.source.errors[:number].size).to eq(1)
+        expect(payment.source.errors[:verification_value].size).to eq(1)
       end
     end
 
@@ -1184,7 +1261,7 @@ describe Spree::Payment, type: :model do
       before do
         gateway.save!
         payment.save!
-        gateway.destroy
+        gateway.discard
       end
 
       it "works with a soft deleted payment method" do

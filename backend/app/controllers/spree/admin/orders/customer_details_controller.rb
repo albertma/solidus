@@ -32,7 +32,7 @@ module Spree
               @order.refresh_shipment_rates
             end
 
-            flash[:success] = Spree.t('customer_details_updated')
+            flash[:success] = t('spree.customer_details_updated')
             redirect_to edit_admin_order_url(@order)
           else
             render action: :edit
@@ -51,7 +51,7 @@ module Spree
         end
 
         def load_order
-          @order = Spree::Order.includes(:adjustments).find_by_number!(params[:order_id])
+          @order = Spree::Order.includes(:adjustments).find_by!(number: params[:order_id])
         end
 
         def model_class
@@ -63,7 +63,7 @@ module Spree
         end
 
         def insufficient_stock_error
-          flash[:error] = Spree.t(:insufficient_stock_for_order)
+          flash[:error] = t('spree.insufficient_stock_for_order')
           redirect_to edit_admin_order_customer_url(@order)
         end
       end

@@ -33,6 +33,7 @@ custom frontend instead of using [`solidus_frontend`](https://github.com/solidus
 [![Circle CI](https://circleci.com/gh/solidusio/solidus/tree/master.svg?style=shield)](https://circleci.com/gh/solidusio/solidus/tree/master)
 [![Gem](https://img.shields.io/gem/v/solidus.svg)](https://rubygems.org/gems/solidus)
 [![License](http://img.shields.io/badge/license-BSD-yellowgreen.svg)](LICENSE.md)
+[![Slack](http://slack.solidus.io/badge.svg)](http://slack.solidus.io)
 
 Demo
 ----
@@ -43,7 +44,9 @@ Try out Solidus with one-click on Heroku:
 Getting started
 ---------------
 
-To add solidus, begin with a Rails 5 application. Add the following to your
+Begin by making sure you have [Imagemagick](http://imagemagick.org/script/download.php) installed, which is required for Paperclip. (You can install it using [Homebrew](https://brew.sh) if you're on a Mac.)
+
+To add solidus, begin with a Rails 5 application and a database configured and created. Add the following to your
 Gemfile.
 
 ```ruby
@@ -130,6 +133,20 @@ include. This can be disabled by adding the following to
 config.assets.debug = false
 ```
 
+### Turbolinks
+
+To gain some extra speed you may enable Turbolinks inside of Solidus admin.
+
+Add `gem 'turbolinks', '~> 5.0.0'` into your `Gemfile` (if not already present) and append these lines to `vendor/assets/spree/backend/all.js`:
+
+```js
+//= require turbolinks
+//= require backend/app/assets/javascripts/spree/backend/turbolinks-integration.js
+```
+
+**CAUTION** Please be aware that Turbolinks can break extensions and/or customizations to the Solidus admin.
+Use at own risk.
+
 Developing Solidus
 ------------------
 
@@ -171,60 +188,72 @@ data already loaded.
 
 ### Tests
 
+Solidus uses [RSpec](http://rspec.info) for tests. Refer to its documentation for
+more information about the testing library.
+
 #### CircleCI
+
 We use CircleCI to run the tests for Solidus as well as all incoming pull
 requests. All pull requests must pass to be merged.
 
 You can see the build statuses at
-[https://circleci.com/gh/solidusio/solidus](https://circleci.com/gh/solidusio/solidus)
+[https://circleci.com/gh/solidusio/solidus](https://circleci.com/gh/solidusio/solidus).
 
-#### Running all tests
+#### Run all tests
 
-To execute all the tests, run this command at the root of the Solidus project
-to generate test applications and run specs for all projects:
+To execute all the tests for all projects, run `rake` in the top-level
+directory.
 
 ```shell
-bash build.sh
+bundle install
+rake
 ```
 
-This runs using postgresql by default, but can be overridden by specifying
-`DB=sqlite` or `DB=mysql` in the environment.
+This runs using Sqlite by default, but can be overridden by setting the `DB`
+environment variable to `DB=postgresql` or `DB=mysql`. For example:
 
-[PhantomJS](http://phantomjs.org/) is required for the frontend and backend
-test suites.
+```
+rake DB=postgresql
+```
 
-#### Running an individual test suite
+[ChromeDriver](https://sites.google.com/a/chromium.org/chromedriver/home) is
+required to run the frontend and backend test suites.
 
-Each gem contains its own series of tests, and for each directory, you need to
-do a quick one-time creation of a test application and then you can use it to run
-the tests.  For example, to run the tests for the core project.
+#### Run an individual test suite
+
+Each gem contains its own series of tests. To run the tests for the core project:
+
 ```shell
 cd core
-bundle exec rake test_app
-bundle exec rspec spec
+bundle exec rspec
 ```
 
-If you would like to run specs against a particular database you may specify the
-dummy apps database, which defaults to sqlite3.
+By default, `rspec` runs the tests for SQLite 3. If you would like to run specs
+against another database you may specify the database in the command:
+
 ```shell
-DB=postgresql bundle exec rake test_app
+DB=postgresql bundle exec rspec
 ```
 
-You can also enable fail fast in order to stop tests at the first failure
-```shell
-FAIL_FAST=true bundle exec rspec spec/models/state_spec.rb
-```
+#### Code coverage reports
 
-If you want to run the simplecov code coverage report
+If you want to run the [SimpleCov](https://github.com/colszowka/simplecov) code
+coverage report:
+
 ```shell
-COVERAGE=true bundle exec rspec spec
+COVERAGE=true bundle exec rspec
 ```
 
 ### Extensions
-In addition to core functionality provided in Solidus, there are a number of ways to add
-features to your store that are not (or not yet) part of the core project.
+
+In addition to core functionality provided in Solidus, there are a number of
+ways to add features to your store that are not (or not yet) part of the core
+project.
 
 A list can be found at [extensions.solidus.io](http://extensions.solidus.io/).
+
+If you want to write an extension for Solidus, you can use the
+[solidus_cmd](https://www.github.com/solidusio/solidus_cmd.git) gem.
 
 Contributing
 ------------

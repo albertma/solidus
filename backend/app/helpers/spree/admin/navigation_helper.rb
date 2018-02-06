@@ -32,7 +32,7 @@ module Spree
         elsif admin_breadcrumbs.any?
           admin_breadcrumbs.map{ |x| strip_tags(x) }.reverse.join(' - ')
         else
-          Spree.t(controller.controller_name, default: controller.controller_name.titleize)
+          t(controller.controller_name, default: controller.controller_name.titleize, scope: 'spree')
         end
       end
 
@@ -50,7 +50,7 @@ module Spree
         options[:route] ||= "admin_#{args.first}"
 
         destination_url = options[:url] || spree.send("#{options[:route]}_path")
-        label = Spree.t(options[:label], scope: [:admin, :tab])
+        label = t(options[:label], scope: [:spree, :admin, :tab])
 
         css_classes = []
 
@@ -79,30 +79,31 @@ module Spree
 
       def link_to_clone(resource, options = {})
         options[:data] = { action: 'clone' }
-        link_to_with_icon('copy', Spree.t(:clone), clone_object_url(resource), options)
+        options[:method] = :post
+        link_to_with_icon('copy', t('spree.clone'), clone_object_url(resource), options)
       end
 
       def link_to_new(resource)
         options[:data] = { action: 'new' }
-        link_to_with_icon('plus', Spree.t(:new), edit_object_url(resource))
+        link_to_with_icon('plus', t('spree.new'), edit_object_url(resource))
       end
 
       def link_to_edit(resource, options = {})
         url = options[:url] || edit_object_url(resource)
         options[:data] = { action: 'edit' }
-        link_to_with_icon('edit', Spree.t('actions.edit'), url, options)
+        link_to_with_icon('edit', t('spree.actions.edit'), url, options)
       end
 
       def link_to_edit_url(url, options = {})
         options[:data] = { action: 'edit' }
-        link_to_with_icon('edit', Spree.t('actions.edit'), url, options)
+        link_to_with_icon('edit', t('spree.actions.edit'), url, options)
       end
 
       def link_to_delete(resource, options = {})
         url = options[:url] || object_url(resource)
-        name = options[:name] || Spree.t('actions.delete')
-        confirm = options[:confirm] || Spree.t(:are_you_sure)
-        options[:class] = "delete-resource"
+        name = options[:name] || t('spree.actions.delete')
+        confirm = options[:confirm] || t('spree.are_you_sure')
+        options[:class] = "#{options[:class]} delete-resource".strip
         options[:data] = { confirm: confirm, action: 'remove' }
         link_to_with_icon 'trash', name, url, options
       end
@@ -116,9 +117,12 @@ module Spree
         link_to(text, url, options)
       end
 
-      def icon(icon_name)
+      def solidus_icon(icon_name)
         icon_name ? content_tag(:i, '', class: icon_name) : ''
       end
+
+      alias_method :icon, :solidus_icon
+      deprecate icon: :solidus_icon, deprecator: Spree::Deprecation
 
       def button(text, icon_name = nil, button_type = 'submit', options = {})
         class_names = "button"

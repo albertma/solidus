@@ -96,11 +96,17 @@ module Spree
     # admin) or is closed, this is a noop.
     #
     # @return [BigDecimal] New amount of this adjustment
-    def update!
-      return amount if finalized?
+    def recalculate
+      if finalized? && !tax?
+        return amount
+      end
 
-      # If the adjustment has no source, do not attempt to re-calculate the amount.
-      # Chances are likely that this was a manually created adjustment in the admin backend.
+      # If the adjustment has no source, do not attempt to re-calculate the
+      # amount.
+      # Some scenarios where this happens:
+      #   - Adjustments that are manually created via the admin backend
+      #   - PromotionAction adjustments where the PromotionAction was deleted
+      #     after the order was completed.
       if source.present?
         self.amount = source.compute_amount(adjustable)
 
@@ -114,6 +120,15 @@ module Spree
         update_columns(eligible: eligible, amount: amount, updated_at: Time.current) if changed?
       end
       amount
+    end
+
+    def update!(*args)
+      if args.empty?
+        Spree::Deprecation.warn "Calling adjustment.update! with no arguments to recalculate amounts and eligibility is deprecated, since it conflicts with AR::Base#update! Please use adjustment.recalculate instead"
+        recalculate
+      else
+        super
+      end
     end
 
     # Calculates based on attached promotion (if this is a promotion

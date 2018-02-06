@@ -119,7 +119,7 @@ module Spree
       action_taken
     end
 
-    # called anytime order.update! happens
+    # called anytime order.recalculate happens
     def eligible?(promotable, promotion_code: nil)
       return false if inactive?
       return false if usage_limit_exceeded?
@@ -237,8 +237,7 @@ module Spree
       when Spree::LineItem
         !promotable.product.promotionable?
       when Spree::Order
-        promotable.line_items.any? &&
-          promotable.line_items.joins(:product).where(spree_products: { promotionable: false }).any?
+        promotable.line_items.joins(:product).where(spree_products: { promotionable: false }).exists?
       end
     end
 

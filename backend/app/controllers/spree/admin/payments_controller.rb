@@ -24,7 +24,7 @@ module Spree
       def create
         @payment = PaymentCreate.new(@order, object_params).build
         if @payment.payment_method.source_required? && params[:card].present? && params[:card] != 'new'
-          @payment.source = @payment.payment_method.payment_source_class.find_by_id(params[:card])
+          @payment.source = @payment.payment_method.payment_source_class.find_by(id: params[:card])
         end
 
         begin
@@ -41,7 +41,7 @@ module Spree
             flash[:success] = flash_message_for(@payment, :successfully_created)
             redirect_to admin_order_payments_path(@order)
           else
-            flash[:error] = Spree.t(:payment_could_not_be_created)
+            flash[:error] = t('spree.payment_could_not_be_created')
             render :new
           end
         rescue Spree::Core::GatewayError => e
@@ -56,9 +56,9 @@ module Spree
         # Because we have a transition method also called void, we do this to avoid conflicts.
         event = "void_transaction" if event == "void"
         if @payment.send("#{event}!")
-          flash[:success] = Spree.t(:payment_updated)
+          flash[:success] = t('spree.payment_updated')
         else
-          flash[:error] = Spree.t(:cannot_perform_operation)
+          flash[:error] = t('spree.cannot_perform_operation')
         end
       rescue Spree::Core::GatewayError => ge
         flash[:error] = ge.message.to_s
@@ -87,7 +87,7 @@ module Spree
       end
 
       def load_order
-        @order = Spree::Order.find_by_number!(params[:order_id])
+        @order = Spree::Order.find_by!(number: params[:order_id])
         authorize! action, @order
         @order
       end
@@ -107,13 +107,13 @@ module Spree
 
       def require_bill_address
         if Spree::Config[:order_bill_address_used] && @order.bill_address.nil?
-          flash[:notice] = Spree.t(:fill_in_customer_info)
+          flash[:notice] = t('spree.fill_in_customer_info')
           redirect_to edit_admin_order_customer_url(@order)
         end
       end
 
       def insufficient_stock_error
-        flash[:error] = Spree.t(:insufficient_stock_for_order)
+        flash[:error] = t('spree.insufficient_stock_for_order')
         redirect_to new_admin_order_payment_url(@order)
       end
     end

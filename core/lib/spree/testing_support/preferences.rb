@@ -12,12 +12,15 @@ module Spree
         Spree::Config.instance_variables.each { |iv| Spree::Config.remove_instance_variable(iv) }
         Spree::Config.preference_store = Spree::Config.default_preferences
 
+        if defined?(Railties)
+          Rails.application.config.spree = Spree::Config.environment
+        end
+
         configure_spree_preferences(&config_block) if block_given?
       end
 
       def configure_spree_preferences
-        config = Rails.application.config.spree.preferences
-        yield(config) if block_given?
+        yield(Spree::Config) if block_given?
       end
 
       def assert_preference_unset(preference)

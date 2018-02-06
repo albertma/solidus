@@ -1,6 +1,8 @@
-require 'spec_helper'
+require 'rails_helper'
 
-describe Spree::OrderShipping do
+RSpec.describe Spree::OrderShipping do
+  include ActiveSupport::Testing::TimeHelpers
+
   let(:order) { create(:order_ready_to_ship, line_items_count: 1) }
 
   def emails
@@ -19,7 +21,11 @@ describe Spree::OrderShipping do
 
     describe "shipment email" do
       it "should send a shipment email" do
-        expect { subject }.to change { emails.size }.by(1)
+        expect {
+          perform_enqueued_jobs {
+            subject
+          }
+        }.to change { emails.size }.by(1)
         expect(emails.last.subject).to eq("#{order.store.name} Shipment Notification ##{order.number}")
       end
     end
@@ -29,7 +35,8 @@ describe Spree::OrderShipping do
     end
 
     it "updates shipment.shipped_at" do
-      Timecop.freeze do |now|
+      now = Time.current
+      travel_to(now) do
         expect { subject }.to change { shipment.shipped_at }.from(nil).to be_within(1.second).of(now)
       end
     end
@@ -37,7 +44,7 @@ describe Spree::OrderShipping do
     it "updates order.updated_at" do
       future = 1.minute.from_now
       expect do
-        Timecop.freeze(future) do
+        travel_to(future) do
           subject
         end
       end.to change { order.updated_at }.to be_within(1.second).of(future)
@@ -219,9 +226,9 @@ describe Spree::OrderShipping do
     end
 
     context "with stale inventory units (regression test)" do
-      let(:order) { FactoryGirl.create(:order_ready_to_ship, line_items_count: 1) }
+      let(:order) { FactoryBot.create(:order_ready_to_ship, line_items_count: 1) }
       let(:shipment) do
-        FactoryGirl.create(
+        FactoryBot.create(
           :shipment,
           order: order
         )

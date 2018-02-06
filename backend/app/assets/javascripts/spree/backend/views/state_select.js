@@ -24,7 +24,7 @@ Spree.Views.StateSelect = Backbone.View.extend({
   onChange: function() {
     this.model.set({
       state_name: this.$state_input.val(),
-      state_id: this.$state_select.select2("val")
+      state_id: this.$state_select.val()
     })
   },
 
@@ -34,16 +34,16 @@ Spree.Views.StateSelect = Backbone.View.extend({
     if (country_id) {
       this.states = Spree.Views.StateSelect.stateCache(country_id);
       this.listenTo(this.states, "sync", this.render);
-      this.render();
     }
+    this.render();
   },
 
   render: function() {
-    this.$state_select.empty().select2("destroy").hide();
-    this.$state_input.hide();
+    this.$state_select.empty().hide().prop('disabled', true);
+    this.$state_input.hide().prop('disabled', true);
 
-    if (!this.states.fetched) {
-      this.$state_select.show().select2().select2("disable");
+    if (!this.model.get('country_id') || !this.states.fetched) {
+      this.$state_select.show();
     } else if (this.states.length) {
       var $state_select = this.$state_select;
       this.states.each(function(state) {
@@ -52,9 +52,9 @@ Spree.Views.StateSelect = Backbone.View.extend({
         );
       })
       this.$state_select.val(this.model.get("state_id"))
-      this.$state_select.show().select2().select2("enable");
+      this.$state_select.show().prop("disabled", false);
     } else {
-      this.$state_input.prop('disabled', false).show();
+      this.$state_input.show().prop('disabled', false);
     }
   }
 })

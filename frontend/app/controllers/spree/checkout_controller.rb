@@ -76,7 +76,7 @@ module Spree
     end
 
     def set_successful_flash_notice
-      flash.notice = Spree.t(:order_processed_successfully)
+      flash.notice = t('spree.order_processed_successfully')
       flash['order_completed'] = true
     end
 
@@ -155,7 +155,7 @@ module Spree
     def ensure_sufficient_stock_lines
       if @order.insufficient_stock_lines.present?
         out_of_stock_items = @order.insufficient_stock_lines.collect(&:name).to_sentence
-        flash[:error] = Spree.t(:inventory_error_flash_for_insufficient_quantity, names: out_of_stock_items)
+        flash[:error] = t('spree.inventory_error_flash_for_insufficient_quantity', names: out_of_stock_items)
         redirect_to spree.cart_path
       end
     end
@@ -171,8 +171,9 @@ module Spree
     end
 
     def before_address
-      # if the user has a default address, a callback takes care of setting
-      # that; but if he doesn't, we need to build an empty one here
+      @order.assign_default_user_addresses
+      # If the user has a default address, the previous method call takes care
+      # of setting that; but if he doesn't, we need to build an empty one here
       default = {country_id: Spree::Country.default.id}
       @order.build_bill_address(default) unless @order.bill_address
       @order.build_ship_address(default) if @order.checkout_steps.include?('delivery') && !@order.ship_address
@@ -205,7 +206,7 @@ module Spree
     end
 
     def rescue_from_spree_gateway_error(exception)
-      flash.now[:error] = Spree.t(:spree_gateway_error_flash_for_checkout)
+      flash.now[:error] = t('spree.spree_gateway_error_flash_for_checkout')
       @order.errors.add(:base, exception.message)
       render :edit
     end

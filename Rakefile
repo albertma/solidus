@@ -1,30 +1,38 @@
-require 'rake'
-require 'thor/group'
-begin
-  require 'spree/testing_support/common_rake'
-rescue LoadError
-  raise "Could not find spree/testing_support/common_rake. You need to run this command using Bundler."
+task default: :spec
+
+def print_title(gem_name = '')
+  title = ["Solidus", gem_name].join(' ')
+  puts "\n#{'-' * title.size}\n#{title}\n#{'-' * title.size}"
 end
 
-task default: :test
-
-desc "Runs all tests in all Spree engines"
-task test: :test_app do
-  %w(api backend core frontend sample).each do |gem_name|
-    Dir.chdir("#{File.dirname(__FILE__)}/#{gem_name}") do
-      sh 'rspec'
+def subproject_task(project, task, title: project, task_name: nil)
+  task_name ||= "#{task}:#{project}"
+  task task_name do
+    print_title(title)
+    Dir.chdir("#{File.dirname(__FILE__)}/#{project}") do
+      sh "rake #{task}"
     end
   end
 end
 
-desc "Generates a dummy app for testing for every Spree engine"
-task :test_app do
-  %w(api backend core frontend sample).each do |gem_name|
-    Dir.chdir("#{File.dirname(__FILE__)}/#{gem_name}") do
-      sh 'rake test_app'
-    end
+%w[spec db:drop db:create db:migrate db:reset].each do |task|
+  %w(api backend core frontend sample).each do |project|
+    desc "Run specs for #{project}" if task == 'spec'
+    subproject_task(project, task)
   end
+
+  desc "Run rake #{task} for each Solidus engine"
+  task task => %w(api backend core frontend sample).map { |p| "#{task}:#{p}" }
 end
+
+desc "Run backend JS specs"
+subproject_task("backend", "spec:js", title: "backend JS", task_name: "spec:backend:js")
+
+# Add backend JS specs to `rake spec` dependencies
+task :spec => 'spec:backend:js'
+
+task test: :spec
+task test_app: 'db:reset'
 
 desc "clean the whole repository by removing all the generated files"
 task :clean do
@@ -33,6 +41,7 @@ task :clean do
   rm_rf "pkg"
 
   %w(api backend core frontend sample).each do |gem_name|
+    print_title(gem_name)
     rm_f  "#{gem_name}/Gemfile.lock"
     rm_rf "#{gem_name}/pkg"
     rm_rf "#{gem_name}/spec/dummy"
@@ -47,8 +56,10 @@ namespace :gem do
 
   def for_each_gem
     %w(core api backend frontend sample).each do |gem_name|
+      print_title(gem_name)
       yield "pkg/solidus_#{gem_name}-#{version}.gem"
     end
+    print_title
     yield "pkg/solidus-#{version}.gem"
   end
 
@@ -64,6 +75,7 @@ namespace :gem do
       end
     end
 
+    print_title
     sh "gem build solidus.gemspec"
     mv "solidus-#{version}.gem", pkgdir
   end
@@ -87,7 +99,7 @@ namespace :gem do
   end
 end
 
-desc "Creates a sandbox application for simulating the Spree code in a deployed Rails app"
+desc "Creates a sandbox application for simulating the Solidus code in a deployed Rails app"
 task :sandbox do
   Bundler.with_clean_env do
     exec("lib/sandbox.sh")

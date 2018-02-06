@@ -1,3 +1,5 @@
+require 'cancan'
+
 module Spree
   module Core
     module ControllerHelpers
@@ -17,7 +19,7 @@ module Spree
 
           class_attribute :unauthorized_redirect
           self.unauthorized_redirect = -> do
-            flash[:error] = Spree.t(:authorization_failure)
+            flash[:error] = I18n.t('spree.authorization_failure')
             redirect_to "/unauthorized"
           end
 
@@ -68,7 +70,7 @@ module Spree
           # This one will be defined by Devise
           elsif respond_to?(:current_spree_user)
             current_spree_user
-                    end
+          end
         end
       end
     end

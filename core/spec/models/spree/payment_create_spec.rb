@@ -1,4 +1,4 @@
-require 'spec_helper'
+require 'rails_helper'
 
 module Spree
   RSpec.describe PaymentCreate do
@@ -62,8 +62,8 @@ module Spree
           expect(new_payment).not_to be_persisted
           expect(new_payment.source).not_to be_persisted
           expect(new_payment.source).not_to be_valid
-          expect(new_payment.source.error_on(:number)).to be_present
-          expect(new_payment.source.error_on(:verification_value).size).to be_present
+          expect(new_payment.source.errors[:number]).to be_present
+          expect(new_payment.source.errors[:verification_value].size).to be_present
         end
       end
     end
@@ -154,12 +154,20 @@ module Spree
       context "unpermitted" do
         let(:attributes) { ActionController::Parameters.new(valid_attributes) }
 
-        it "ignores all attributes" do
-          expect(new_payment).to have_attributes(
-            amount: 0,
-            payment_method: nil,
-            source: nil
-          )
+        if Rails.gem_version < Gem::Version.new('5.1')
+          it "ignores all attributes" do
+            expect(new_payment).to have_attributes(
+              amount: 0,
+              payment_method: nil,
+              source: nil
+            )
+          end
+        else
+          it "raises an exception" do
+            expect {
+              new_payment
+            }.to raise_exception(ActionController::UnfilteredParameters)
+          end
         end
       end
 

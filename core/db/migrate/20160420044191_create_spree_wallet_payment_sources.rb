@@ -1,5 +1,7 @@
 class CreateSpreeWalletPaymentSources < ActiveRecord::Migration[4.2]
   def change
+    return if table_exists?(:spree_wallet_payment_sources)
+
     create_table :spree_wallet_payment_sources do |t|
       t.references(
         :user,

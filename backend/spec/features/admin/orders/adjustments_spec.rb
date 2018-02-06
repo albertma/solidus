@@ -5,7 +5,7 @@ describe "Adjustments", type: :feature do
 
   let!(:ship_address) { create(:address) }
   let!(:tax_zone) { create(:global_zone) } # will include the above address
-  let!(:tax_rate) { create(:tax_rate, amount: 0.20, zone: tax_zone, tax_category: tax_category) }
+  let!(:tax_rate) { create(:tax_rate, amount: 0.20, zone: tax_zone, tax_categories: [tax_category]) }
 
   let!(:order) do
     create(
@@ -22,7 +22,7 @@ describe "Adjustments", type: :feature do
   let!(:adjustment) { order.adjustments.create!(order: order, label: 'Rebate', amount: 10) }
 
   before(:each) do
-    order.update!
+    order.recalculate
 
     visit spree.admin_path
     click_link "Orders"
@@ -65,7 +65,7 @@ describe "Adjustments", type: :feature do
         fill_in "adjustment_amount", with: ""
         fill_in "adjustment_label", with: ""
         click_button "Continue"
-        expect(page).to have_content("Description can't be blank")
+        expect(page).to have_content("Label can't be blank")
         expect(page).to have_content("Amount is not a number")
       end
     end
@@ -98,7 +98,7 @@ describe "Adjustments", type: :feature do
         fill_in "adjustment_amount", with: ""
         fill_in "adjustment_label", with: ""
         click_button "Continue"
-        expect(page).to have_content("Description can't be blank")
+        expect(page).to have_content("Label can't be blank")
         expect(page).to have_content("Amount is not a number")
       end
     end

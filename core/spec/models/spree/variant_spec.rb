@@ -1,8 +1,8 @@
 # encoding: utf-8
 
-require 'spec_helper'
+require 'rails_helper'
 
-describe Spree::Variant, type: :model do
+RSpec.describe Spree::Variant, type: :model do
   let!(:variant) { create(:variant) }
 
   it_behaves_like 'default_price'
@@ -16,6 +16,12 @@ describe Spree::Variant, type: :model do
     it "should validate price is 0" do
       variant.price = 0
       expect(variant).to be_valid
+    end
+
+    it "should require a product" do
+      expect(variant).to be_valid
+      variant.product = nil
+      expect(variant).to be_invalid
     end
   end
 
@@ -63,8 +69,8 @@ describe Spree::Variant, type: :model do
 
       let(:tax_category) { create(:tax_category) }
 
-      let!(:high_vat) { create(:tax_rate, included_in_price: true, amount: 0.25, zone: high_vat_zone, tax_category: tax_category) }
-      let!(:low_vat) { create(:tax_rate, included_in_price: true, amount: 0.15, zone: low_vat_zone, tax_category: tax_category) }
+      let!(:high_vat) { create(:tax_rate, included_in_price: true, amount: 0.25, zone: high_vat_zone, tax_categories: [tax_category]) }
+      let!(:low_vat) { create(:tax_rate, included_in_price: true, amount: 0.15, zone: low_vat_zone, tax_categories: [tax_category]) }
 
       let(:product) { build(:product, tax_category: tax_category) }
 
@@ -108,7 +114,7 @@ describe Spree::Variant, type: :model do
   context "product has other variants" do
     describe "option value accessors" do
       before {
-        @multi_variant = FactoryGirl.create :variant, product: variant.product
+        @multi_variant = FactoryBot.create :variant, product: variant.product
         variant.product.reload
       }
 
@@ -139,7 +145,7 @@ describe Spree::Variant, type: :model do
       context "and a variant is soft-deleted" do
         let!(:old_options_text) { variant.options_text }
 
-        before { variant.destroy }
+        before { variant.discard }
 
         it "still keeps the option values for that variant" do
           expect(variant.reload.options_text).to eq(old_options_text)
@@ -648,19 +654,43 @@ describe Spree::Variant, type: :model do
     end
   end
 
-  describe "deleted_at scope" do
-    let!(:previous_variant_price) { variant.display_price }
+  describe "#discard" do
+    it "discards related associations" do
+      variant.images = [create(:image)]
 
-    before { variant.destroy }
+      expect(variant.stock_items).not_to be_empty
+      expect(variant.prices).not_to be_empty
+      expect(variant.currently_valid_prices).not_to be_empty
 
-    it "should keep its price if deleted" do
-      expect(variant.display_price).to eq(previous_variant_price)
+      variant.discard
+
+      expect(variant.images).to be_empty
+      expect(variant.stock_items).to be_empty
+      expect(variant.prices).to be_empty
+      expect(variant.currently_valid_prices).to be_empty
     end
 
-    context 'when loading with pre-fetching of default_price' do
-      it 'also keeps the previous price' do
-        reloaded_variant = Spree::Variant.with_deleted.includes(:default_price).find_by(id: variant.id)
-        expect(reloaded_variant.display_price).to eq(previous_variant_price)
+    describe 'default_price' do
+      let!(:previous_variant_price) { variant.display_price }
+
+      it "should discard default_price" do
+        variant.discard
+        variant.reload
+        expect(variant.default_price).to be_discarded
+      end
+
+      it "should keep its price if deleted" do
+        variant.discard
+        variant.reload
+        expect(variant.display_price).to eq(previous_variant_price)
+      end
+
+      context 'when loading with pre-fetching of default_price' do
+        it 'also keeps the previous price' do
+          variant.discard
+          reloaded_variant = Spree::Variant.with_deleted.includes(:default_price).find_by(id: variant.id)
+          expect(reloaded_variant.display_price).to eq(previous_variant_price)
+        end
       end
     end
   end
@@ -720,6 +750,40 @@ describe Spree::Variant, type: :model do
 
       it 'includes items without inventory' do
         expect( subject ).to include out_of_stock_variant
+      end
+    end
+  end
+
+  describe ".suppliable" do
+    subject { Spree::Variant.suppliable }
+    let!(:in_stock_variant) { create(:variant) }
+    let!(:out_of_stock_variant) { create(:variant) }
+    let!(:backordered_variant) { create(:variant) }
+    let!(:stock_location) { create(:stock_location) }
+
+    before do
+      in_stock_variant.stock_items.update_all(count_on_hand: 10)
+      backordered_variant.stock_items.update_all(count_on_hand: 0, backorderable: true)
+      out_of_stock_variant.stock_items.update_all(count_on_hand: 0, backorderable: false)
+    end
+
+    it "includes the in stock variant" do
+      expect( subject ).to include(in_stock_variant)
+    end
+
+    it "includes out of stock variant" do
+      expect( subject ).to include(backordered_variant)
+    end
+
+    it "does not include out of stock variant" do
+      expect( subject ).not_to include(out_of_stock_variant)
+    end
+
+    context "inventory levels globally not tracked" do
+      before { Spree::Config.track_inventory_levels = false }
+
+      it "includes all variants" do
+        expect( subject ).to include(in_stock_variant, backordered_variant, out_of_stock_variant)
       end
     end
   end

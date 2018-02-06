@@ -10,7 +10,7 @@ describe "Products", type: :feature do
     end
 
     def build_option_type_with_values(name, values)
-      ot = FactoryGirl.create(:option_type, name: name)
+      ot = FactoryBot.create(:option_type, name: name)
       values.each do |val|
         ot.option_values.create(name: val.downcase, presentation: val)
       end
@@ -69,6 +69,23 @@ describe "Products", type: :feature do
           end
         end
       end
+      context "when none of the product prices are in the same currency as the default in the store" do
+        before do
+          Spree::Config[:currency] = "MXN"
+        end
+
+        let!(:product) do
+          create(:product, name: "Just a product", price: 19.99)
+        end
+
+        it 'defaults it to Spree::Config.currency and sets the price as blank' do
+          Spree::Config[:currency] = "USD"
+          visit spree.admin_product_path(product)
+          within("#product_price_field") do
+            expect(page).to have_content("USD")
+          end
+        end
+      end
     end
 
     context "searching products" do
@@ -81,6 +98,7 @@ describe "Products", type: :feature do
         expect(page).not_to have_content("apache baseball cap")
         check "Show Deleted"
         click_button 'Search'
+        expect(find('input[name="q[with_deleted]"]')).to be_checked
         expect(page).to have_content("zomg shirt")
         expect(page).to have_content("apache baseball cap")
         uncheck "Show Deleted"
@@ -95,17 +113,42 @@ describe "Products", type: :feature do
         create(:product, name: 'zomg shirt')
 
         click_nav "Products"
-        fill_in "q_name_cont", with: "ap"
+        fill_in "Name", with: "ap"
         click_button 'Search'
         expect(page).to have_content("apache baseball cap")
         expect(page).to have_content("apache baseball cap2")
         expect(page).not_to have_content("zomg shirt")
 
-        fill_in "q_variants_including_master_sku_cont", with: "A1"
+        fill_in "SKU", with: "A1"
         click_button "Search"
         expect(page).to have_content("apache baseball cap")
         expect(page).not_to have_content("apache baseball cap2")
         expect(page).not_to have_content("zomg shirt")
+      end
+
+      # Regression test for https://github.com/solidusio/solidus/issues/2016
+      it "should be able to search and sort by price" do
+        product = create(:product, name: 'apache baseball cap', sku: "A001")
+        create(:variant, product: product, sku: "A002")
+        create(:product, name: 'zomg shirt', sku: "Z001")
+
+        click_nav "Products"
+        expect(page).to have_content("apache baseball cap")
+        expect(page).to have_content("zomg shirt")
+        expect(page).to have_css('#listing_products > tbody > tr', count: 2)
+
+        fill_in "SKU", with: "A"
+        click_button 'Search'
+        expect(page).to have_content("apache baseball cap")
+        expect(page).not_to have_content("zomg shirt")
+        expect(page).to have_css('#listing_products > tbody > tr', count: 1)
+
+        # Sort by master price
+        click_on 'Master Price'
+        expect(page).to have_css('.sort_link.asc', text: 'Master Price')
+        expect(page).to have_content("apache baseball cap")
+        expect(page).not_to have_content("zomg shirt")
+        expect(page).to have_css('#listing_products > tbody > tr', count: 1)
       end
     end
 
@@ -113,10 +156,7 @@ describe "Products", type: :feature do
       before(:each) do
         @shipping_category = create(:shipping_category)
         click_nav "Products"
-        click_link "admin_new_product"
-        within('#new_product') do
-          expect(page).to have_content("SKU")
-        end
+        click_on "New Product"
       end
 
       it "should allow an admin to create a new product", js: true do
@@ -131,7 +171,7 @@ describe "Products", type: :feature do
         expect(page).to have_content("successfully updated!")
       end
 
-      it "should show validation errors", js: true do
+      it "should show validation errors", js: false do
         fill_in "product_name", with: "Baseball Cap"
         fill_in "product_sku", with: "B100"
         fill_in "product_price", with: "100"
@@ -234,7 +274,7 @@ describe "Products", type: :feature do
     context 'deleting a product', js: true do
       let!(:product) { create(:product) }
 
-      it "is still viewable" do
+      it "product details are still viewable" do
         visit spree.admin_products_path
 
         expect(page).to have_content(product.name)
@@ -249,6 +289,9 @@ describe "Products", type: :feature do
         click_button "Search"
         click_link product.name
         expect(page).to have_field('Master Price', with: product.price.to_f)
+        expect(page).to_not have_content('Images')
+        expect(page).to_not have_content('Prices')
+        expect(page).to_not have_content('Product Properties')
       end
     end
   end

@@ -1,6 +1,12 @@
+require 'discard'
+
 module Spree
   class StoreCreditEvent < Spree::Base
     acts_as_paranoid
+    include Spree::ParanoiaDeprecations
+
+    include Discard::Model
+    self.discard_column = :deleted_at
 
     belongs_to :store_credit
     belongs_to :originator, polymorphic: true
@@ -44,11 +50,11 @@ module Spree
 
     def display_action
       return if NON_EXPOSED_ACTIONS.include?(action)
-      Spree.t("store_credit.display_action.#{action}")
+      I18n.t("spree.store_credit.display_action.#{action}")
     end
 
     def order
-      Spree::Payment.find_by_response_code(authorization_code).try(:order)
+      Spree::Payment.find_by(response_code: authorization_code).try(:order)
     end
   end
 end
